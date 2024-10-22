@@ -23,14 +23,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -39,7 +41,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFloatingActionButton
@@ -54,98 +56,116 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tacite.contactapp.data.local.ContactEntity
-import com.tacite.contactapp.ui.screen.ContactsScreen
-import com.tacite.contactapp.ui.screen.DetailsScreen
 import com.tacite.contactapp.ui.theme.ContactAppTheme
 import com.tacite.contactapp.util.Constants
-import com.tacite.contactapp.util.Route
+import com.tacite.contactapp.util.Constants.sendMail
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 
 class MainActivity : ComponentActivity() {
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ContactAppTheme {
 
-                val viewModel : MainViewModel by viewModel()
+                val viewModel: MainViewModel by viewModel()
                 val uiState = viewModel.uiState
 
-                var isDropDownMenuExpanded by remember { mutableStateOf(false) }
-                var isUpdateDialogShowed by remember { mutableStateOf(false) }
+                val handler = LocalUriHandler.current
 
-                var newNames by remember { mutableStateOf("") }
-                var newTel by remember { mutableStateOf("") }
+                var currentContact by rememberSaveable {
+                    mutableStateOf<ContactEntity?>(null)
+                }
 
+                var isDropDownMenuExpanded by rememberSaveable { mutableStateOf(false) }
+                var isSearchDropDownMenuExpanded by rememberSaveable { mutableStateOf(false) }
+                var isUpdateDialogShowed by rememberSaveable { mutableStateOf(false) }
 
-                val navController = rememberNavController()
+                var names by rememberSaveable { mutableStateOf(currentContact?.noms ?: "") }
+                var tel by rememberSaveable { mutableStateOf(currentContact?.tel ?: "") }
+                var email by rememberSaveable { mutableStateOf(currentContact?.email ?: "") }
+                var fb by rememberSaveable { mutableStateOf(currentContact?.fb ?: "") }
+                var x by rememberSaveable { mutableStateOf(currentContact?.x ?: "") }
+                var linkedin by rememberSaveable { mutableStateOf(currentContact?.linkedin ?: "") }
+
                 Scaffold(
                     topBar = {
                         SearchBar(
                             modifier = Modifier
-                                .padding(16.dp)
                                 .fillMaxWidth(),
                             inputField = {
                                 SearchBarDefaults.InputField(
                                     query = uiState.query,
                                     onQueryChange = viewModel::onQueryTextChange,
-                                    onSearch = {  },
+                                    onSearch = { },
                                     expanded = uiState.isSearchExpanded,
                                     onExpandedChange = { viewModel.onSetSearchExpanded() },
                                     placeholder = { Text("Rechercher") },
                                     leadingIcon = {
-                                        if(uiState.isSearchExpanded){
-                                            IconButton(onClick = { viewModel.onSetSearchExpanded()}) {
-                                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                                        if (uiState.isSearchExpanded) {
+                                            IconButton(onClick = { viewModel.onSetSearchExpanded() }) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                                    contentDescription = null
+                                                )
                                             }
-                                        }else{
+                                        } else {
                                             Icon(Icons.Default.Search, contentDescription = null)
                                         }
                                     },
                                     trailingIcon = {
                                         Row {
-                                            if(uiState.query.isNotBlank()){
-                                                IconButton(onClick = { viewModel.onClearQuery()}) {
-                                                    Icon(Icons.Default.Clear, contentDescription = null)
+                                            if (uiState.query.isNotBlank()) {
+                                                IconButton(onClick = { viewModel.onClearQuery() }) {
+                                                    Icon(
+                                                        Icons.Default.Clear,
+                                                        contentDescription = null
+                                                    )
                                                 }
                                             }
                                             Column {
-                                                IconButton(onClick = { isDropDownMenuExpanded = true }) {
-                                                    Icon(Icons.Default.MoreVert, contentDescription = null)
+                                                IconButton(onClick = {
+                                                    isSearchDropDownMenuExpanded = true
+                                                }) {
+                                                    Icon(
+                                                        Icons.Default.MoreVert,
+                                                        contentDescription = null
+                                                    )
                                                 }
                                                 DropdownMenu(
-                                                    expanded = isDropDownMenuExpanded,
-                                                    onDismissRequest = { isDropDownMenuExpanded = false }) {
+                                                    expanded = isSearchDropDownMenuExpanded,
+                                                    onDismissRequest = {
+                                                        isSearchDropDownMenuExpanded = false
+                                                    }) {
 
                                                     DropdownMenuItem(
                                                         text = { Text(text = "Tous") },
                                                         onClick = {
                                                             viewModel.loadAllContacts(true)
-                                                            isDropDownMenuExpanded = false
+                                                            isSearchDropDownMenuExpanded = false
                                                         })
 
                                                     DropdownMenuItem(
                                                         text = { Text(text = "Favoris") },
                                                         onClick = {
                                                             viewModel.loadAllContacts(false)
-                                                            isDropDownMenuExpanded = false
+                                                            isSearchDropDownMenuExpanded = false
                                                         })
 
                                                 }
@@ -158,19 +178,20 @@ class MainActivity : ComponentActivity() {
                             onExpandedChange = { viewModel.onSetSearchExpanded() },
                         ) {
                             Column {
-                                if(uiState.query.isNotBlank()){
+                                if (uiState.query.isNotBlank()) {
                                     LazyColumn {
-                                        items(uiState.filteredContacts){
+                                        items(uiState.filteredContacts) {contact->
+
                                             ListItem(
-                                                headlineContent = { Text(text = it.noms) },
-                                                supportingContent = { Text(it.tel) },
+                                                headlineContent = { Text(text = contact.noms) },
+                                                supportingContent = { Text(contact.tel) },
                                                 overlineContent = {
 
                                                 },
                                                 leadingContent = {
                                                     Column {
                                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            if (it.isFavorite){
+                                                            if (contact.isFavorite){
                                                                 Icon(
                                                                     imageVector = Icons.Default.Star,
                                                                     contentDescription = null,
@@ -185,11 +206,11 @@ class MainActivity : ComponentActivity() {
                                                                 Modifier
                                                                     .size(40.dp)
                                                                     .clip(CircleShape)
-                                                                    .background(Color(it.color)),
+                                                                    .background(Color(contact.color)),
                                                                 contentAlignment = Alignment.Center
                                                             ) {
                                                                 Text(
-                                                                    text = it.noms.first().uppercase(),
+                                                                    text = contact.noms.first().uppercase(),
                                                                     style = TextStyle(
                                                                         color = MaterialTheme.colorScheme.onPrimary,
                                                                         fontSize = 24.sp
@@ -198,65 +219,131 @@ class MainActivity : ComponentActivity() {
                                                             }
                                                         }
 
-                                                        DropdownMenu(
-                                                            expanded = isDropDownMenuExpanded,
-                                                            onDismissRequest = { isDropDownMenuExpanded = false }) {
-
-                                                            DropdownMenuItem(
-                                                                text = {
-                                                                    Row (verticalAlignment = Alignment.CenterVertically){
-                                                                        Icon(imageVector = Icons.Default.Star, contentDescription = null)
-                                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                                        Text(text = "Ajouter aux favoris")
-                                                                    }
-                                                                },
-                                                                onClick = {
-                                                                    viewModel.updateContact(it.copy(isFavorite = true))
-                                                                    isDropDownMenuExpanded = false
-                                                                })
-
-                                                            DropdownMenuItem(
-                                                                text = {
-                                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                                        Icon(imageVector = Icons.Default.Delete, contentDescription = null)
-                                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                                        Text(text = "Supprimer")
-                                                                    }
-                                                                },
-                                                                onClick = {
-                                                                    viewModel.deleteContact(it)
-                                                                    isDropDownMenuExpanded = false
-                                                                })
-
-                                                        }
-
                                                     }
 
 
                                                 },
                                                 trailingContent = {
                                                     Row {
-                                                        IconButton(onClick = { sendSMS(it.tel) }) {
+                                                        IconButton(onClick = { sendSMS(contact.tel) }) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Email,
                                                                 contentDescription = null )
                                                         }
-                                                        IconButton(onClick = {callNumber(it.tel) }) {
+                                                        IconButton(onClick = {callNumber(contact.tel) }) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Call,
                                                                 contentDescription = null )
                                                         }
+                                                        Column {
+                                                            IconButton(onClick = { isDropDownMenuExpanded = true}) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.MoreVert,
+                                                                    contentDescription = null )
+                                                            }
+                                                            DropdownMenu(
+                                                                expanded = isDropDownMenuExpanded,
+                                                                onDismissRequest = { isDropDownMenuExpanded = false }) {
+
+                                                                if(contact.email.isNotBlank()){
+                                                                    DropdownMenuItem(
+                                                                        text = {
+                                                                            Row (verticalAlignment = Alignment.CenterVertically){
+                                                                                Text(text = "Email")
+                                                                            }
+                                                                        },
+                                                                        onClick = {
+                                                                            sendMail(contact.email, "")
+                                                                            isDropDownMenuExpanded = false
+                                                                        })
+                                                                }
+
+                                                                if(contact.fb.isNotBlank()){
+                                                                    DropdownMenuItem(
+                                                                        text = {
+                                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                                Text(text = "Facebook")
+                                                                            }
+                                                                        },
+                                                                        onClick = {
+                                                                            handler.openUri(contact.fb)
+                                                                            isDropDownMenuExpanded = false
+                                                                        })
+                                                                }
+
+                                                                if(contact.x.isNotBlank()){
+                                                                    DropdownMenuItem(
+                                                                        text = {
+                                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                                Text(text = "X (Twitter)")
+                                                                            }
+                                                                        },
+                                                                        onClick = {
+                                                                            handler.openUri(contact.x)
+                                                                            isDropDownMenuExpanded = false
+                                                                        })
+                                                                }
+
+                                                                if(contact.linkedin.isNotBlank()){
+                                                                    DropdownMenuItem(
+                                                                        text = {
+                                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                                Text(text = "Linkedn")
+                                                                            }
+                                                                        },
+                                                                        onClick = {
+                                                                            handler.openUri(contact.linkedin)
+                                                                            isDropDownMenuExpanded = false
+                                                                        })
+                                                                }
+
+                                                                HorizontalDivider()
+
+                                                                DropdownMenuItem(
+                                                                    text = {
+                                                                        Row (verticalAlignment = Alignment.CenterVertically){
+                                                                            Icon(imageVector = Icons.Default.Star, contentDescription = null)
+                                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                                            Text(text = "Ajouter aux favoris")
+                                                                        }
+                                                                    },
+                                                                    onClick = {
+                                                                        viewModel.updateContact(contact.copy(isFavorite = true))
+                                                                        isDropDownMenuExpanded = false
+                                                                    })
+
+                                                                DropdownMenuItem(
+                                                                    text = {
+                                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                            Icon(imageVector = Icons.Default.Edit, contentDescription = null)
+                                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                                            Text(text = "Modifier")
+                                                                        }
+                                                                    },
+                                                                    onClick = {
+                                                                        isDropDownMenuExpanded = false
+                                                                    })
+
+                                                                DropdownMenuItem(
+                                                                    text = {
+                                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                            Icon(imageVector = Icons.Default.Delete, contentDescription = null)
+                                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                                            Text(text = "Supprimer")
+                                                                        }
+                                                                    },
+                                                                    onClick = {
+                                                                        viewModel.updateContact(contact)
+                                                                        isDropDownMenuExpanded = false
+                                                                    })
+                                                            }
+                                                        }
+
                                                     }
                                                 },
                                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                                 modifier =
                                                 Modifier
-                                                    .combinedClickable(
-                                                        onClick = {},
-                                                        onLongClick = {
-                                                            isDropDownMenuExpanded = true
-                                                        }
-                                                    )
                                                     .fillMaxWidth()
                                                     .padding(top = 4.dp, bottom = 4.dp)
                                             )
@@ -274,76 +361,142 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
-                    NavHost(navController, startDestination = Route.Contacts, Modifier.padding(innerPadding)) {
-                        composable<Route.Contacts> {
-                            ContactsScreen(
-                                contacts = uiState.contacts,
-                                onDeleteContact = {contact->
-                                    viewModel.deleteContact(contact)
-                                },
-                                onSetContactToFavorite = {contact->
-                                    viewModel.updateContact(contact.copy(isFavorite = true))
-                                },
-                                onSMSAction = {
-                                    sendSMS(it.tel)
-                                },
-                                onCallAction = {
-                                    callNumber(it.tel)
-                                }
-                            )
-                        }
-                        composable<Route.ContactDetails> {
-                            DetailsScreen()
-                        }
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        ContactsScreen(
+                            contacts = uiState.contacts,
+                            onUpdateContact = {
+                                currentContact = it
+                                names = it.noms
+                                tel = it.tel
+                                email = it.email
+                                fb = it.fb
+                                x = it.x
+                                linkedin = it.linkedin
+                                isUpdateDialogShowed = true
+
+                            },
+                            onDeleteContact = { contact ->
+                                viewModel.deleteContact(contact)
+                            },
+                            onSetContactToFavorite = { contact ->
+                                viewModel.updateContact(contact.copy(isFavorite = true))
+                            },
+                            onSMSAction = {
+                                sendSMS(it.tel)
+                            },
+                            onCallAction = {
+                                callNumber(it.tel)
+                            }
+                        )
                     }
+
                 }
 
 
-                if(isUpdateDialogShowed){
+                if (isUpdateDialogShowed) {
 
                     Dialog(onDismissRequest = {
                         isUpdateDialogShowed = false
-                        newNames = ""
-                        newTel = ""
+                        currentContact = null
                     }) {
                         Card {
                             Column(
                                 Modifier
                                     .padding(16.dp)
-                                    .fillMaxWidth()) {
-                                Text(text = "Ajouter contact")
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                Text(text = "${if (currentContact == null) "Ajouter" else "Modifier"} contact")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 OutlinedTextField(
                                     modifier = Modifier.fillMaxWidth(),
-                                    value = newNames,
-                                    onValueChange = {newNames = it},
-                                    label = { Text(text = "Noms")}
+                                    value = names,
+                                    onValueChange = { names = it },
+                                    label = { Text(text = "Noms") }
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 OutlinedTextField(
                                     modifier = Modifier.fillMaxWidth(),
-                                    value = newTel,
-                                    onValueChange = {newTel = it},
-                                    label = { Text(text = "Numéro de téléphone")}
+                                    value = tel,
+                                    onValueChange = { tel = it },
+                                    label = { Text(text = "Numéro de téléphone") }
                                 )
 
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Absolute.Right) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    value = email,
+                                    onValueChange = { email = it },
+                                    label = { Text(text = "Adresse E-mail") }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    value = fb,
+                                    onValueChange = { fb = it },
+                                    label = { Text(text = "Lien profil Facebook") }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    value = x,
+                                    onValueChange = { x = it },
+                                    label = { Text(text = "Lien profil X") }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    value = linkedin,
+                                    onValueChange = { linkedin = it },
+                                    label = { Text(text = "Lien profil Linkedin") }
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Absolute.Right
+                                ) {
                                     TextButton(onClick = {
                                         isUpdateDialogShowed = false
-                                        newNames = ""
-                                        newTel = ""
+                                        names = ""
+                                        tel = ""
+                                        email = ""
+                                        fb = ""
+                                        x = ""
+                                        linkedin = ""
+                                        currentContact = null
                                     }) {
                                         Text(text = "Annuler")
                                     }
                                     TextButton(
-                                        enabled = newTel.isNotBlank() && newNames.isNotBlank()
-                                        ,onClick = {
-                                            viewModel.updateContact(ContactEntity(0,newNames,newTel,false,Constants.colors.random()))
-                                            newNames = ""
-                                            newTel = ""
+                                        enabled = tel.isNotBlank() && names.isNotBlank(),
+                                        onClick = {
+                                            viewModel.updateContact(
+                                                ContactEntity(
+                                                    currentContact?.id ?: 0,
+                                                    names,
+                                                    tel,
+                                                    email,
+                                                    fb,
+                                                    x,
+                                                    linkedin,
+                                                    currentContact?.isFavorite ?: false,
+                                                    currentContact?.color
+                                                        ?: Constants.colors.random()
+                                                ),
+                                            )
+                                            names = ""
+                                            tel = ""
+                                            email = ""
+                                            fb = ""
+                                            x = ""
+                                            linkedin = ""
+                                            currentContact = null
                                             isUpdateDialogShowed = false
 
-                                    }) {
+                                        }) {
                                         Text(text = "Enregistrer")
                                     }
                                 }
@@ -363,9 +516,13 @@ class MainActivity : ComponentActivity() {
         smsIntent.data = Uri.parse("smsto:$phoneNumber")
 
         if (smsIntent.resolveActivity(packageManager) != null) {
-            ContextCompat.startActivity(this,smsIntent,null)
+            ContextCompat.startActivity(this, smsIntent, null)
         } else {
-            Toast.makeText(this, "No SMS app available. Please install a SMS app from the Play Store.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "No SMS app available. Please install a SMS app from the Play Store.",
+                Toast.LENGTH_LONG
+            ).show()
             val nintent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
             startActivity(nintent)
         }
@@ -379,7 +536,11 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
 
         } else {
-            Toast.makeText(this, "No dialer app available. Please install a dialer app from the Play Store.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "No dialer app available. Please install a dialer app from the Play Store.",
+                Toast.LENGTH_LONG
+            ).show()
             val nintent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
             startActivity(nintent)
         }

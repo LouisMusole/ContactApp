@@ -14,7 +14,6 @@ class MainViewModel(private val repository: ContactRepository) : ViewModel() {
 
     var uiState by mutableStateOf(UiState())
 
-
     init {
         loadAllContacts(true)
     }
@@ -43,7 +42,6 @@ class MainViewModel(private val repository: ContactRepository) : ViewModel() {
         }
     }
 
-
     private fun filteredContacts(query :String){
         viewModelScope.launch {
             repository.getContacts(query).collect{
@@ -52,7 +50,6 @@ class MainViewModel(private val repository: ContactRepository) : ViewModel() {
             }
         }
     }
-
 
     fun onQueryTextChange(text: String) {
         uiState = uiState.copy(query = text)

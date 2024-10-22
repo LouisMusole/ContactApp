@@ -9,6 +9,10 @@ data class ContactEntity(
     val id : Int = 0,
     val noms : String,
     val tel : String,
+    val email : String,
+    val fb : String,
+    val x : String,
+    val linkedin : String,
     val isFavorite : Boolean,
     val color : Long
 )
